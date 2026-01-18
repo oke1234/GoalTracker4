@@ -122,11 +122,14 @@ export default function App() {
   const [newGoalTitle, setNewGoalTitle] = useState('');
   const [newGoalDays, setNewGoalDays] = useState('');
 
+  // Add this useEffect in your App.js after the useTasks hook
+
+// In App.js, update the destructuring from useTasks:
   const {
     tasks,
     setTasks, 
-    checkedStates,
-    doneTasks,
+    activeTasks, // NEW
+    doneTasks, // NEW (computed from tasks)
     doneCollapsed,
     selectedSubtask,
     editedSubtaskText,
@@ -152,20 +155,60 @@ export default function App() {
     handleAddTask,
     handleDelete,
     toggleCheckTask,
-    toggleUncheckDoneTask,
+    // REMOVED: toggleUncheckDoneTask - no longer exists
   } = useTasks({   
-  setGoals,
-  calculateStreaks,
-  setWorkoutCompleted,
-  setIsAddingTask,
-  setShowAddSubtask,
-  setSelectedTask,
-  setEditedText,
-  setEditedDesc,
-  setNewTaskText,
-  setFilteredSuggestions,
-  setCurrentPage,
+    setGoals,
+    calculateStreaks,
+    setWorkoutCompleted,
+    setIsAddingTask,
+    setShowAddSubtask,
+    setSelectedTask,
+    setEditedText,
+    setEditedDesc,
+    setNewTaskText,
+    setFilteredSuggestions,
+    setCurrentPage,
   });
+
+  // ADD THIS NEW EFFECT TO SYNC TASKS TO FIREBASE
+  useEffect(() => {
+    if (!userId || !tasks) return;
+    
+    const saveTasksToFirebase = async () => {
+      try {
+        await set(ref(db, `users/${userId}/tasks`), tasks);
+        console.log("✅ Tasks saved to Firebase");
+      } catch (err) {
+        console.error("❌ Error saving tasks to Firebase:", err);
+        setError("Failed to save tasks");
+      }
+    };
+
+    // Debounce the save to avoid too many writes
+    const timer = setTimeout(saveTasksToFirebase, 500);
+    return () => clearTimeout(timer);
+  }, [tasks, userId]);
+
+  // ADD THIS NEW EFFECT TO LOAD TASKS FROM FIREBASE ON STARTUP
+  useEffect(() => {
+    if (!userId) return;
+    
+    const loadTasksFromFirebase = async () => {
+      try {
+        const snapshot = await get(ref(db, `users/${userId}/tasks`));
+        if (snapshot.exists()) {
+          const loadedTasks = snapshot.val();
+          setTasks(loadedTasks);
+          console.log("✅ Tasks loaded from Firebase");
+        }
+      } catch (err) {
+        console.error("❌ Error loading tasks from Firebase:", err);
+      }
+    };
+
+    loadTasksFromFirebase();
+  }, [userId]);
+
 
   useEffect(() => {
     const signIn = async () => {
@@ -1178,12 +1221,13 @@ export default function App() {
                 handleAddTask={handleAddTask}
                 handleAddSuggestionTask={handleAddSuggestionTask}
                 setIsAddingTask={setIsAddingTask}
-                tasks={tasks}
-                doneTasks={doneTasks}
+                tasks={tasks} // Full tasks array for finding indices
+                activeTasks={activeTasks} // NEW: filtered active tasks
+                doneTasks={doneTasks} // Already filtered done tasks
                 doneCollapsed={doneCollapsed}
                 setDoneCollapsed={setDoneCollapsed}
                 toggleCheckTask={toggleCheckTask}
-                toggleUncheckDoneTask={toggleUncheckDoneTask}
+                // REMOVED: toggleUncheckDoneTask
                 updateSubtaskChecked={updateSubtaskChecked}
                 deleteSubtask={deleteSubtask}
                 setSelectedTask={setSelectedTask}
